@@ -41,4 +41,49 @@
 2. **Склонируйте или скачайте репозиторий**  
    Клонируйте репозиторий или скачайте файлы `steam_autologin.py`, `config.py` и `requirements.txt` в одну папку:
    ```bash
-   git clone <URL_репозитория>
+   git clone https://github.com/naviprivet/steam_autologin.git
+   ```
+
+3. **Установите зависимости**  
+   В командной строке или терминале перейдите в папку с проектом и выполните:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Настройте конфигурацию**  
+   Отредактируйте файл config.py, указав:
+
+   `STEAM_PATH`: Путь к исполняемому файлу Steam (например, `r"C:\Program Files (x86)\Steam\Steam.exe"`).  
+   `ACCOUNTS_DIR`: Путь к папке с `.mafile` файлами (например, `r"C:\Users\YourUser\PycharmProjects\steam_autologin\mafiles"`).  
+   `ACCOUNTS_FILE`: Путь к файлу с логинами и паролями (например, `r"C:\Users\YourUser\PycharmProjects\steam_autologin\accounts.txt"`).
+   
+   Пример `config.py`:
+   ```python
+   STEAM_PATH = r"C:\Program Files (x86)\Steam\Steam.exe"
+   ACCOUNTS_DIR = r"C:\Users\YourUser\PycharmProjects\steam_autologin\mafiles"
+   ACCOUNTS_FILE = r"C:\Users\YourUser\PycharmProjects\steam_autologin\accounts.txt"
+   ```
+
+## Настройка аккаунтов
+
+   **Создайте файл с логинами и паролями**  
+
+   В файле, указанном в `ACCOUNTS_FILE`, запишите логины и пароли в формате `логин:пароль`, по одной записи на строку. Пример:
+   ```bash
+   user1:password1
+   user2:password2
+   ```
+
+## Использование
+
+1. **Запустите скрипт**  
+   
+   В командной строке или терминале перейдите в папку со скриптом и выполните:  
+   ```bash
+   python main.py
+   ```
+
+2. **Выберите аккаунт**
+
+  - Скрипт выведет список найденных аккаунтов на основе `.mafile` файлов.
+  - Введите номер аккаунта (например, `1`) или `q` для выхода.
