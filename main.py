@@ -1,170 +1,129 @@
-import json
 import os
-import subprocess
-import time
+import threading
+import tkinter as tk
+from tkinter import ttk
+
 import pyautogui
-from colorama import init, Fore, Style
-from generate_2fa import generate_2fa
-from config import STEAM_PATH, ACCOUNTS_DIR, ACCOUNTS_FILE, DELAY
+from ttkbootstrap import Window
 
-# Инициализация colorama
-init(autoreset=True)
+from config import ACCOUNTS_DIR, ACCOUNTS_FILE
+from helpers import load_mafile, load_accounts, find_mafile_accounts, kill_process, login
 
-def load_mafile(account_name):
-    """Загрузка .mafile"""
-    path = os.path.join(ACCOUNTS_DIR, f"{account_name}.mafile")
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"{Fore.RED}❌ Ошибка при загрузке {path}: {e}{Style.RESET_ALL}")
-        raise
 
-def load_accounts():
-    """Загрузка логинов и паролей"""
-    accounts = {}
-    if os.path.exists(ACCOUNTS_FILE):
-        try:
-            with open(ACCOUNTS_FILE, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if ':' in line:
-                        login, password = line.strip().split(':', 1)
-                        accounts[login] = password
-            print(f"{Fore.BLUE}[DEBUG] Загружено аккаунтов из {ACCOUNTS_FILE}: {len(accounts)}{Style.RESET_ALL}")
-        except Exception as e:
-            print(f"{Fore.RED}❌ Ошибка при загрузке {ACCOUNTS_FILE}: {e}{Style.RESET_ALL}")
-    return accounts
+def create_gui():
+    # Создаём окно с тёмной темой
+    root = Window(title="Steam Account Login", themename="darkly")
+    root.geometry("450x400")
+    root.resizable(False, False)
+    root.attributes('-alpha', 0.98)  # Лёгкая полупрозрачность для Apple-стиля
 
-def find_mafile_accounts():
-    """Поиск всех .mafile файлов в ACCOUNTS_DIR"""
-    print(f"{Fore.BLUE}[DEBUG] Поиск файлов в папке: {ACCOUNTS_DIR}{Style.RESET_ALL}")
-    mafiles = []
-    try:
-        for f in os.listdir(ACCOUNTS_DIR):
-            print(f"{Fore.BLUE}[DEBUG] Обнаружен файл: {f}{Style.RESET_ALL}")
-            if f.lower().endswith('.mafile'):
-                mafiles.append(f)
-    except Exception as e:
-        print(f"{Fore.RED}❌ Ошибка при доступе к папке {ACCOUNTS_DIR}: {e}{Style.RESET_ALL}")
-        return []
-
-    accounts = [os.path.splitext(f)[0] for f in mafiles]
-    print(f"{Fore.BLUE}[DEBUG] Найдено .mafile файлов: {len(accounts)}{Style.RESET_ALL}")
-    return accounts
-
-def kill_process(name):
-    """Закрытие процесса"""
-    print(f"{Fore.GREEN}[INFO] Закрываем процесс: {name}.exe{Style.RESET_ALL}")
-    os.system(f"taskkill /f /im {name}.exe >nul 2>&1")
-    time.sleep(2)
-
-def clear_steam_auth_data():
-    """Очистка данных авторизации Steam"""
-    print(f"{Fore.GREEN}[INFO] Очищаем данные авторизации Steam...{Style.RESET_ALL}")
-    kill_process("steam")
-    loginusers_path = os.path.join(os.path.dirname(STEAM_PATH), "config", "loginusers.vdf")
-    try:
-        if os.path.exists(loginusers_path):
-            os.remove(loginusers_path)
-            print(f"{Fore.GREEN}[INFO] Удален файл: {loginusers_path}{Style.RESET_ALL}")
-        else:
-            print(f"{Fore.GREEN}[INFO] Файл {loginusers_path} не найден{Style.RESET_ALL}")
-    except Exception as e:
-        print(f"{Fore.RED}[ERROR] Ошибка при удалении loginusers.vdf: {e}{Style.RESET_ALL}")
-    cache_path = os.path.join(os.path.dirname(STEAM_PATH), "appcache")
-    try:
-        if os.path.exists(cache_path):
-            for item in os.listdir(cache_path):
-                item_path = os.path.join(cache_path, item)
-                if os.path.isfile(item_path):
-                    os.remove(item_path)
-                    print(f"{Fore.GREEN}[INFO] Удален файл кэша: {item_path}{Style.RESET_ALL}")
-    except Exception as e:
-        print(f"{Fore.RED}[ERROR] Ошибка при очистке кэша: {e}{Style.RESET_ALL}")
-
-def login(account, password, shared_secret):
-    """Процесс входа"""
-    clear_steam_auth_data()
-    kill_process("steam")
-
-    print(f"{Fore.GREEN}[INFO] Запускаем Steam...{Style.RESET_ALL}")
-    subprocess.Popen(STEAM_PATH)
-    print(f"{Fore.GREEN}[INFO] Ожидаем {DELAY * 2} секунд для загрузки окна логина...{Style.RESET_ALL}")
-    time.sleep(DELAY * 2)
-
-    print(f"{Fore.GREEN}[INFO] Вводим логин: {account}{Style.RESET_ALL}")
-    pyautogui.typewrite(account)
-    pyautogui.press('tab')
-    print(f"{Fore.GREEN}[INFO] Вводим пароль{Style.RESET_ALL}")
-    pyautogui.typewrite(password)
-    pyautogui.press('enter')
-    time.sleep(DELAY)
-
-    print(f"{Fore.GREEN}[INFO] Вводим 2FA-код...{Style.RESET_ALL}")
-    code = generate_2fa(shared_secret)
-    pyautogui.typewrite(code)
-    pyautogui.press('enter')
-    print(f"{Fore.CYAN}🔑 {account} | Код 2FA: {code}{Style.RESET_ALL}")
-    time.sleep(DELAY * 2)
-
-def main():
-    print(f"{Fore.YELLOW}⚠️ Пожалуйста, переключите раскладку клавиатуры на английскую (US English)!{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}⏳ Даём 5 секунд для смены раскладки...{Style.RESET_ALL}")
-    time.sleep(5)
-
+    # Создаём папку для .mafile
     os.makedirs(ACCOUNTS_DIR, exist_ok=True)
 
+    # Загружаем пароли
     passwords = load_accounts()
     if not passwords:
         with open(ACCOUNTS_FILE, 'w', encoding='utf-8') as f:
             f.write("логин1:пароль1\nлогин2:пароль2")
-        print(f"{Fore.RED}📝 Создан файл {ACCOUNTS_FILE}. Заполните его!{Style.RESET_ALL}")
+        ttk.Label(root, text=f"Создан файл {ACCOUNTS_FILE}. Заполните его!", bootstyle="danger").pack(pady=10)
+        root.after(3000, root.destroy)  # Закрываем через 3 секунды
         return
 
-    while True:
-        mafile_accounts = find_mafile_accounts()
-        if not mafile_accounts:
-            print(f"{Fore.RED}❌ Не найдено ни одного .mafile файла в папке {ACCOUNTS_DIR}{Style.RESET_ALL}")
+    # Загружаем аккаунты
+    mafile_accounts = find_mafile_accounts()
+    if not mafile_accounts:
+        ttk.Label(root, text=f"Не найдено .mafile файлов в {ACCOUNTS_DIR}", bootstyle="danger").pack(pady=10)
+        root.after(3000, root.destroy)
+        return
+
+    # Контейнер для элементов
+    frame = ttk.Frame(root, padding=20)
+    frame.pack(expand=True, fill="both")
+
+    # Заголовок
+    ttk.Label(frame, text="Steam Account Login", font=("Helvetica", 18, "bold"), style="light.TLabel").pack(
+        pady=(0, 20))
+
+    # Выбор аккаунта
+    ttk.Label(frame, text="Выберите аккаунт:", font=("Helvetica", 12)).pack(anchor="w")
+    account_var = tk.StringVar()
+    account_combobox = ttk.Combobox(frame, textvariable=account_var, values=mafile_accounts, state="readonly",
+                                    font=("Helvetica", 11))
+    account_combobox.pack(fill="x", pady=(5, 15))
+    if mafile_accounts:
+        account_combobox.set(mafile_accounts[0])
+
+    # Статус
+    status_label = ttk.Label(frame, text="Ожидание выбора аккаунта...", font=("Helvetica", 10), wraplength=400,
+                             style="default.TLabel")
+    status_label.pack(pady=(0, 20))
+
+    # Кнопки
+    button_frame = ttk.Frame(frame)
+    button_frame.pack(fill="x")
+
+    def start_login():
+        account = account_var.get()
+        if not account:
+            status_label.config(text="Выберите аккаунт!", bootstyle="danger")
             return
-
-        print(f"{Fore.YELLOW}\n📋 Найденные аккаунты:{Style.RESET_ALL}")
-        for i, account in enumerate(mafile_accounts, 1):
-            print(f"{Fore.YELLOW}{i}. {account}{Style.RESET_ALL}")
-
+        password = passwords.get(account)
+        if not password:
+            status_label.config(text=f"Пароль для {account} не найден в {ACCOUNTS_FILE}!", bootstyle="danger")
+            return
         try:
-            choice = input(f"\nВведите номер аккаунта (или 'q' для выхода): ")
-            if choice.lower() == 'q':
-                print(f"{Fore.GREEN}[INFO] Выход из программы{Style.RESET_ALL}")
-                break
+            mafile = load_mafile(account)
+            status_label.config(text=f"Вход в аккаунт: {account}...", bootstyle="success")
+            threading.Thread(target=login, args=(account, password, mafile['shared_secret'], status_label, root),
+                             daemon=True).start()
+        except Exception as e:
+            status_label.config(text=f"Ошибка: {str(e)}", bootstyle="danger")
+            print(f"{Fore.RED}❌ Ошибка: {str(e)}")
 
-            choice = int(choice)
-            if choice < 1 or choice > len(mafile_accounts):
-                print(f"{Fore.RED}❌ Неверный номер аккаунта!{Style.RESET_ALL}")
-                continue
+    ttk.Button(button_frame, text="Войти", command=start_login, style="primary.Outline.TButton").pack(side="left",
+                                                                                                      padx=5)
 
-            account = mafile_accounts[choice - 1]
-            print(f"{Fore.GREEN}\n🚀 Вход в аккаунт: {account}{Style.RESET_ALL}")
+    def logout():
+        kill_process("steam")
+        status_label.config(text="Ожидание выбора аккаунта...", style="default.TLabel")
 
-            password = passwords.get(account)
-            if not password:
-                print(f"{Fore.RED}❌ Пароль для {account} не найден в {ACCOUNTS_FILE}!{Style.RESET_ALL}")
-                continue
+    ttk.Button(button_frame, text="Выйти из аккаунта", command=logout, style="secondary.Outline.TButton").pack(
+        side="left", padx=5)
 
-            try:
-                mafile = load_mafile(account)
-                login(account, password, mafile['shared_secret'])
+    def refresh_accounts():
+        nonlocal mafile_accounts
+        mafile_accounts = find_mafile_accounts()
+        account_combobox['values'] = mafile_accounts
+        if mafile_accounts:
+            account_combobox.set(mafile_accounts[0])
+        else:
+            status_label.config(text="Не найдено .mafile файлов!", bootstyle="danger")
+            account_combobox.set("")
 
-                input(f"{Fore.YELLOW}\n⏳ Нажмите Enter для выхода из аккаунта и возврата в меню...{Style.RESET_ALL}")
-                kill_process("steam")
-            except Exception as e:
-                print(f"{Fore.RED}❌ Ошибка: {str(e)}{Style.RESET_ALL}")
-                input(f"{Fore.YELLOW}\n⏳ Нажмите Enter для возврата в меню...{Style.RESET_ALL}")
-                kill_process("steam")
+    ttk.Button(button_frame, text="Обновить", command=refresh_accounts, style="info.Outline.TButton").pack(side="left",
+                                                                                                           padx=5)
 
-        except ValueError:
-            print(f"{Fore.RED}❌ Введите корректный номер аккаунта!{Style.RESET_ALL}")
-            continue
+    # Кнопка выхода
+    ttk.Button(frame, text="Закрыть", command=lambda: [kill_process("steam"), root.destroy()],
+               style="danger.Outline.TButton").pack(pady=(20, 0))
+
+    # Анимация статуса (мигание при ожидании)
+    def blink_status():
+        if "Ожидаем" in status_label.cget("text") or "Запускаем" in status_label.cget("text"):
+            current_color = status_label.cget("foreground")
+            new_color = "#00ff00" if current_color != "#00ff00" else "#80ff80"
+            status_label.config(foreground=new_color)
+        root.after(500, blink_status)
+
+    root.after(500, blink_status)
+
+    # Напоминание о раскладке
+    ttk.Label(frame, text="Убедитесь, что раскладка клавиатуры — английская (US English)", font=("Helvetica", 9),
+              style="warning.TLabel").pack(pady=(20, 0))
+
+    root.mainloop()
+
 
 if __name__ == "__main__":
     pyautogui.FAILSAFE = True
-    main()
+    create_gui()
