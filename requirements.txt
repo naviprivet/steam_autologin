@@ -1,2 +1,3 @@
 pyautogui==0.9.54
 colorama~=0.4.6
+ttkbootstrap~=1.13.5
