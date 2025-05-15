@@ -1,69 +1,19 @@
-import os
-import time
 import json
-import base64
-import hmac
-import struct
-import pyautogui
+import os
 import subprocess
-from datetime import datetime
+import time
+
+import pyautogui
 
 import config
+import generate_2fa
+from generate_2fa import generate_2fa
 
 # Настройки
 STEAM_PATH = config.STEAM_PATH
 ACCOUNTS_DIR = config.ACCOUNTS_DIR
 ACCOUNTS_FILE = config.ACCOUNTS_FILE  # Файл с логинами:паролями
-DELAY = 5
-
-
-def generate_2fa(shared_secret):
-    """Генерация 5-значного Steam Guard кода с латинскими буквами и цифрами"""
-    try:
-        # Проверка shared_secret
-        if not shared_secret:
-            raise ValueError("shared_secret is empty")
-
-        # Декодирование Base64
-        try:
-            key = base64.b64decode(shared_secret, validate=True)
-        except Exception as e:
-            raise ValueError(f"Invalid Base64 in shared_secret: {e}")
-
-        # Получение времени
-        timestamp = int(time.time())
-        print(f"[DEBUG] Timestamp: {timestamp} ({datetime.fromtimestamp(timestamp)})")
-
-        # Формирование временного буфера (время / 30 секунд)
-        time_buffer = struct.pack('>Q', timestamp // 30)
-
-        # Вычисление HMAC-SHA1
-        hmac_hash = hmac.new(key, time_buffer, 'sha1').digest()
-        print(f"[DEBUG] HMAC hash: {hmac_hash.hex()}")
-
-        # Получение офсета
-        offset = hmac_hash[-1] & 0x0F
-        print(f"[DEBUG] Offset: {offset}")
-
-        # Извлечение 4 байт с учетом офсета
-        code = struct.unpack('>I', hmac_hash[offset:offset + 4])[0] & 0x7FFFFFFF
-        print(f"[DEBUG] Raw code: {code}")
-
-        # Таблица символов Steam Guard (26 символов: 2-9, B-Y, без A, I, O, U, Z)
-        steam_chars = '23456789BCDFGHJKMNPQRTVWXY'
-
-        # Генерация 5-значного кода
-        final_code = ''
-        for _ in range(5):
-            code, remainder = divmod(code, len(steam_chars))
-            final_code += steam_chars[remainder]
-
-        print(f"[DEBUG] Final 2FA code: {final_code}")
-        return final_code
-
-    except Exception as e:
-        print(f"❌ Ошибка в generate_2fa: {e}")
-        raise
+DELAY = config.DELAY
 
 
 def load_mafile(account_name):
@@ -109,8 +59,36 @@ def kill_process(name):
     time.sleep(2)
 
 
+def clear_steam_auth_data():
+    """Очистка данных авторизации Steam"""
+    print("[INFO] Очищаем данные авторизации Steam...")
+    kill_process("steam")  # Закрываем Steam
+    # Удаляем loginusers.vdf
+    loginusers_path = os.path.join(os.path.dirname(STEAM_PATH), "config", "loginusers.vdf")
+    try:
+        if os.path.exists(loginusers_path):
+            os.remove(loginusers_path)
+            print(f"[INFO] Удален файл: {loginusers_path}")
+        else:
+            print(f"[INFO] Файл {loginusers_path} не найден")
+    except Exception as e:
+        print(f"[ERROR] Ошибка при удалении loginusers.vdf: {e}")
+    # Удаляем кэш Steam
+    cache_path = os.path.join(os.path.dirname(STEAM_PATH), "appcache")
+    try:
+        if os.path.exists(cache_path):
+            for item in os.listdir(cache_path):
+                item_path = os.path.join(cache_path, item)
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                    print(f"[INFO] Удален файл кэша: {item_path}")
+    except Exception as e:
+        print(f"[ERROR] Ошибка при очистке кэша: {e}")
+
+
 def login(account, password, shared_secret):
     """Процесс входа"""
+    clear_steam_auth_data()
     kill_process("steam")
 
     # Запуск Steam
