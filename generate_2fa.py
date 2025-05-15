@@ -8,6 +8,7 @@ from colorama import init, Fore
 # Инициализация colorama
 init(autoreset=True)
 
+
 def generate_2fa(shared_secret):
     """Генерация 5-значного Steam Guard кода с латинскими буквами и цифрами"""
     try:
@@ -36,7 +37,7 @@ def generate_2fa(shared_secret):
         offset = hmac_hash[-1] & 0x0F
         print(f"{Fore.BLUE}[DEBUG] Offset: {offset}")
 
-        code = struct.unpack('>I', hmac_hash[offset:offset+4])[0] & 0x7FFFFFFF
+        code = struct.unpack('>I', hmac_hash[offset:offset + 4])[0] & 0x7FFFFFFF
         print(f"{Fore.BLUE}[DEBUG] Raw code: {code}")
 
         # Таблица символов Steam Guard (26 символов: 2-9, B-Y, без A, I, O, U, Z)
